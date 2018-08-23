@@ -1505,6 +1505,30 @@ class TableTest extends TestCase
     }
 
     /**
+     * Test that entity class inflection works for compound nouns
+     *
+     * @return void
+     */
+    public function testEntityClassInflection()
+    {
+        $class = $this->getMockClass('\Cake\ORM\Entity');
+
+        if (!class_exists('TestApp\Model\Entity\CustomCookie')) {
+            class_alias($class, 'TestApp\Model\Entity\CustomCookie');
+        }
+
+        $table = $this->getTableLocator()->get('CustomCookies');
+        $this->assertEquals('TestApp\Model\Entity\CustomCookie', $table->getEntityClass());
+
+        if (!class_exists('TestApp\Model\Entity\Address')) {
+            class_alias($class, 'TestApp\Model\Entity\Address');
+        }
+
+        $table = $this->getTableLocator()->get('Addresses');
+        $this->assertEquals('TestApp\Model\Entity\Address', $table->getEntityClass());
+    }
+
+    /**
      * Tests that using a simple string for entityClass will try to
      * load the class from the Plugin namespace when using plugin notation
      *
@@ -3200,6 +3224,37 @@ class TableTest extends TestCase
         $this->assertFalse($result);
         foreach ($entities as $entity) {
             $this->assertTrue($entity->isNew());
+        }
+    }
+
+    /**
+     * Test saveMany() with failed save due to an exception
+     *
+     * @return void
+     */
+    public function testSaveManyFailedWithException()
+    {
+        $table = $this->getTableLocator()
+            ->get('authors');
+        $entities = [
+            new Entity(['name' => 'mark']),
+            new Entity(['name' => 'jose'])
+        ];
+
+        $table->getEventManager()->on('Model.beforeSave', function (Event $event, Entity $entity) {
+            if ($entity->name === 'jose') {
+                throw new \Exception('Oh noes');
+            }
+        });
+
+        $this->expectException(\Exception::class);
+
+        try {
+            $table->saveMany($entities);
+        } finally {
+            foreach ($entities as $entity) {
+                $this->assertTrue($entity->isNew());
+            }
         }
     }
 
@@ -6150,7 +6205,7 @@ class TableTest extends TestCase
     public function testFindOrCreateTransactions()
     {
         $articles = $this->getTableLocator()->get('Articles');
-        $articles->getEventManager()->on('Model.afterSaveCommit', function ($event, $entity) {
+        $articles->getEventManager()->on('Model.afterSaveCommit', function (Event $event, EntityInterface $entity, ArrayObject $options) {
             $entity->afterSaveCommit = true;
         });
 

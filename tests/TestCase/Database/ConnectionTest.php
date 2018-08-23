@@ -20,8 +20,6 @@ use Cake\Database\Exception\MissingConnectionException;
 use Cake\Database\Exception\NestedTransactionRollbackException;
 use Cake\Database\Log\LoggingStatement;
 use Cake\Database\Log\QueryLogger;
-use Cake\Database\Retry\CommandRetry;
-use Cake\Database\Retry\ReconnectStrategy;
 use Cake\Database\StatementInterface;
 use Cake\Datasource\ConnectionManager;
 use Cake\Log\Log;
@@ -763,6 +761,22 @@ class ConnectionTest extends TestCase
 
         $result = $connection->quoteIdentifier('Model.*');
         $expected = '"Model".*';
+        $this->assertEquals($expected, $result);
+
+        $result = $connection->quoteIdentifier('Items.No_ 2');
+        $expected = '"Items"."No_ 2"';
+        $this->assertEquals($expected, $result);
+
+        $result = $connection->quoteIdentifier('Items.No_ 2 thing');
+        $expected = '"Items"."No_ 2 thing"';
+        $this->assertEquals($expected, $result);
+
+        $result = $connection->quoteIdentifier('Items.No_ 2 thing AS thing');
+        $expected = '"Items"."No_ 2 thing" AS "thing"';
+        $this->assertEquals($expected, $result);
+
+        $result = $connection->quoteIdentifier('Items.Item Category Code = :c1');
+        $expected = '"Items"."Item Category Code" = :c1';
         $this->assertEquals($expected, $result);
 
         $result = $connection->quoteIdentifier('MTD()');

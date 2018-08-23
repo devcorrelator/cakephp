@@ -14,14 +14,12 @@
  */
 namespace Cake\Test\Console;
 
-use Cake\Console\Command;
 use Cake\Console\CommandCollection;
 use Cake\Core\Configure;
 use Cake\Core\Plugin;
 use Cake\Shell\I18nShell;
 use Cake\Shell\RoutesShell;
 use Cake\TestSuite\TestCase;
-use InvalidArgumentException;
 use stdClass;
 use TestApp\Command\DemoCommand;
 
@@ -204,11 +202,13 @@ class CommandCollectionTest extends TestCase
         $collection = new CommandCollection();
         $collection->addMany($collection->autoDiscover());
 
+        $this->assertTrue($collection->has('app'));
         $this->assertTrue($collection->has('demo'));
         $this->assertTrue($collection->has('i18m'));
         $this->assertTrue($collection->has('sample'));
         $this->assertTrue($collection->has('testing_dispatch'));
 
+        $this->assertSame('TestApp\Shell\AppShell', $collection->get('app'));
         $this->assertSame('TestApp\Command\DemoCommand', $collection->get('demo'));
         $this->assertSame('TestApp\Shell\I18mShell', $collection->get('i18m'));
         $this->assertSame('TestApp\Shell\SampleShell', $collection->get('sample'));

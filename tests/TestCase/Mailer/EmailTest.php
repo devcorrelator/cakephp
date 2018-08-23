@@ -20,7 +20,6 @@ use Cake\Log\Log;
 use Cake\Mailer\Email;
 use Cake\Mailer\Transport\DebugTransport;
 use Cake\TestSuite\TestCase;
-use Cake\View\Exception\MissingTemplateException;
 use Exception;
 use SimpleXmlElement;
 
@@ -858,7 +857,7 @@ class EmailTest extends TestCase
      *
      * @return void
      */
-    public function testAttachments()
+    public function testSetAttachments()
     {
         $this->Email->setAttachments(CAKE . 'basics.php');
         $expected = [
@@ -890,6 +889,26 @@ class EmailTest extends TestCase
         $this->assertSame($expected, $this->Email->getAttachments());
         $this->expectException(\InvalidArgumentException::class);
         $this->Email->setAttachments([['nofile' => CAKE . 'basics.php', 'mimetype' => 'text/plain']]);
+    }
+
+    /**
+     * Test send() with no template and data string attachment and no mimetype
+     *
+     * @return void
+     */
+    public function testSetAttachmentDataNoMimetype()
+    {
+        $this->Email->setAttachments(['cake.icon.gif' => [
+            'data' => 'test',
+        ]]);
+        $result = $this->Email->getAttachments();
+        $expected = [
+            'cake.icon.gif' => [
+                'data' => base64_encode('test') . "\r\n",
+                'mimetype' => 'application/octet-stream'
+            ],
+        ];
+        $this->assertSame($expected, $this->Email->getAttachments());
     }
 
     /**
@@ -1318,7 +1337,6 @@ class EmailTest extends TestCase
      *
      * @return void
      */
-
     public function testSendNoTemplateWithDataStringAttachment()
     {
         $this->Email->setTransport('debug');

@@ -488,6 +488,8 @@ abstract class IntegrationTestCase extends TestCase
     protected function _sendRequest($url, $method, $data = [])
     {
         $dispatcher = $this->_makeDispatcher();
+        $url = $dispatcher->resolveUrl($url);
+
         try {
             $request = $this->_buildRequest($url, $method, $data);
             $response = $dispatcher->execute($request);
@@ -603,7 +605,8 @@ abstract class IntegrationTestCase extends TestCase
             $props['input'] = $data;
         }
         if (!isset($props['input'])) {
-            $props['post'] = $this->_addTokens($tokenUrl, $data);
+            $data = $this->_addTokens($tokenUrl, $data);
+            $props['post'] = $this->_castToString($data);
         }
         $props['cookies'] = $this->_cookie;
 
@@ -659,16 +662,45 @@ abstract class IntegrationTestCase extends TestCase
     }
 
     /**
+     * Recursively casts all data to string as that is how data would be POSTed in
+     * the real world
+     *
+     * @param array $data POST data
+     * @return array
+     */
+    protected function _castToString($data)
+    {
+        foreach ($data as $key => $value) {
+            if (is_scalar($value)) {
+                $data[$key] = $value === false ? '0' : (string)$value;
+
+                continue;
+            }
+
+            if (is_array($value)) {
+                $looksLikeFile = isset($value['error'], $value['tmp_name'], $value['size']);
+                if ($looksLikeFile) {
+                    continue;
+                }
+
+                $data[$key] = $this->_castToString($value);
+            }
+        }
+
+        return $data;
+    }
+
+    /**
      * Creates a valid request url and parameter array more like Request::_url()
      *
-     * @param string|array $url The URL
+     * @param string $url The URL
      * @return array Qualified URL and the query parameters
      */
     protected function _url($url)
     {
         // re-create URL in ServerRequest's context so
         // query strings are encoded as expected
-        $request = new ServerRequest(['url' => Router::url($url)]);
+        $request = new ServerRequest(['url' => $url]);
         $url = $request->getRequestTarget();
 
         $query = '';

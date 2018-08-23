@@ -19,9 +19,9 @@ use Cake\Core\Plugin;
 use Cake\TestSuite\ConsoleIntegrationTestCase;
 
 /**
- * HelpShell test.
+ * HelpCommand test.
  */
-class HelpShellTest extends ConsoleIntegrationTestCase
+class HelpCommandTest extends ConsoleIntegrationTestCase
 {
     /**
      * setup method
@@ -63,7 +63,6 @@ class HelpShellTest extends ConsoleIntegrationTestCase
     /**
      * Assert the help output.
      *
-     * @param string $output The output to check.
      * @return void
      */
     protected function assertCommandList()
@@ -77,6 +76,7 @@ class HelpShellTest extends ConsoleIntegrationTestCase
         $this->assertOutputContains('- test_plugin.sample', 'Long plugin name');
         $this->assertOutputContains('- routes', 'core shell');
         $this->assertOutputContains('- example', 'short plugin name');
+        $this->assertOutputContains('- abort', 'command object');
         $this->assertOutputContains('To run a command', 'more info present');
         $this->assertOutputContains('To get help', 'more info present');
     }

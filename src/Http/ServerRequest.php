@@ -112,7 +112,7 @@ class ServerRequest implements ArrayAccess, ServerRequestInterface
      * The full address to the current request
      *
      * @var string
-     * @deprecated 3.4.0 This public property will be removed in 4.0.0. Use getUri()->getPath() instead.
+     * @deprecated 3.4.0 This public property will be removed in 4.0.0. Use getAttribute('here') or getUri()->getPath() instead.
      */
     protected $here;
 
@@ -308,7 +308,7 @@ class ServerRequest implements ArrayAccess, ServerRequestInterface
      */
     protected function _setConfig($config)
     {
-        if (!empty($config['url']) && $config['url'][0] === '/') {
+        if (strlen($config['url']) > 1 && $config['url'][0] === '/') {
             $config['url'] = substr($config['url'], 1);
         }
 
@@ -1107,8 +1107,8 @@ class ServerRequest implements ArrayAccess, ServerRequestInterface
                 $name = $key;
             }
             if ($name !== null) {
-                $name = strtr(strtolower($name), '_', ' ');
-                $name = strtr(ucwords($name), ' ', '-');
+                $name = str_replace('_', ' ', strtolower($name));
+                $name = str_replace(' ', '-', ucwords($name));
                 $headers[$name] = (array)$value;
             }
         }
@@ -2150,7 +2150,7 @@ class ServerRequest implements ArrayAccess, ServerRequestInterface
     /**
      * Get all the attributes in the request.
      *
-     * This will include the params, webroot, and base attributes that CakePHP
+     * This will include the params, webroot, base, and here attributes that CakePHP
      * provides.
      *
      * @return array
@@ -2160,7 +2160,8 @@ class ServerRequest implements ArrayAccess, ServerRequestInterface
         $emulated = [
             'params' => $this->params,
             'webroot' => $this->webroot,
-            'base' => $this->base
+            'base' => $this->base,
+            'here' => $this->here
         ];
 
         return $this->attributes + $emulated;
@@ -2445,5 +2446,5 @@ class ServerRequest implements ArrayAccess, ServerRequestInterface
     }
 }
 
-// @deprecated Add backwards compat alias.
+// @deprecated 3.4.0 Add backwards compat alias.
 class_alias('Cake\Http\ServerRequest', 'Cake\Network\Request');

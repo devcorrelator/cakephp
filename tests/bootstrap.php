@@ -126,9 +126,6 @@ Log::setConfig([
 ]);
 
 Chronos::setTestNow(Chronos::now());
-MutableDateTime::setTestNow(MutableDateTime::now());
-Date::setTestNow(Date::now());
-MutableDate::setTestNow(MutableDate::now());
 
 ini_set('intl.default_locale', 'en_US');
 ini_set('session.gc_divisor', '1');
@@ -139,6 +136,3 @@ loadPHPUnitAliases();
 // does not allow the sessionid to be set after stdout
 // has been written to.
 session_id('cli');
-
-// Fix multiple http/server requests in a single test method.
-$_SERVER['PHP_SELF'] = '/';
