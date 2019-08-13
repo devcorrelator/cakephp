@@ -16,12 +16,15 @@ namespace Cake\Test\TestCase\Database;
 
 use Cake\Database\ExpressionInterface;
 use Cake\Database\Expression\IdentifierExpression;
+use Cake\Database\Expression\QueryExpression;
 use Cake\Database\Query;
 use Cake\Database\StatementInterface;
 use Cake\Database\Statement\StatementDecorator;
+use Cake\Database\Type;
 use Cake\Database\TypeMap;
 use Cake\Datasource\ConnectionManager;
 use Cake\TestSuite\TestCase;
+use TestApp\Database\Type\BarType;
 
 /**
  * Tests Query class
@@ -30,11 +33,11 @@ class QueryTest extends TestCase
 {
 
     public $fixtures = [
-        'core.articles',
-        'core.authors',
-        'core.comments',
-        'core.profiles',
-        'core.menu_link_trees'
+        'core.Articles',
+        'core.Authors',
+        'core.Comments',
+        'core.Profiles',
+        'core.MenuLinkTrees'
     ];
 
     public $autoFixtures = false;
@@ -722,7 +725,7 @@ class QueryTest extends TestCase
             ->from('comments')
             ->where(
                 [
-                    'id' => '3something-crazy',
+                    'id' => '3',
                     'created <' => new \DateTime('2013-01-01 12:00')
                 ],
                 ['created' => 'datetime', 'id' => 'integer']
@@ -738,7 +741,7 @@ class QueryTest extends TestCase
             ->from('comments')
             ->where(
                 [
-                    'id' => '1something-crazy',
+                    'id' => '1',
                     'created <' => new \DateTime('2013-01-01 12:00')
                 ],
                 ['created' => 'datetime', 'id' => 'integer']
@@ -2002,6 +2005,73 @@ class QueryTest extends TestCase
     }
 
     /**
+     * Tests that order() works with closures.
+     *
+     * @return void
+     */
+    public function testSelectOrderByClosure()
+    {
+        $query = new Query($this->connection);
+        $query
+            ->select('*')
+            ->from('articles')
+            ->order(function ($exp, $q) use ($query) {
+                $this->assertInstanceOf(QueryExpression::class, $exp);
+                $this->assertSame($query, $q);
+
+                return ['id' => 'ASC'];
+            });
+
+        $this->assertQuotedQuery(
+            'SELECT \* FROM <articles> ORDER BY <id> ASC',
+            $query->sql(),
+            !$this->autoQuote
+        );
+
+        $query = new Query($this->connection);
+        $query
+            ->select('*')
+            ->from('articles')
+            ->order(function ($exp) {
+                return [$exp->add(['id % 2 = 0']), 'title' => 'ASC'];
+            });
+
+        $this->assertQuotedQuery(
+            'SELECT \* FROM <articles> ORDER BY id % 2 = 0, <title> ASC',
+            $query->sql(),
+            !$this->autoQuote
+        );
+
+        $query = new Query($this->connection);
+        $query
+            ->select('*')
+            ->from('articles')
+            ->order(function ($exp) {
+                return $exp->add('a + b');
+            });
+
+        $this->assertQuotedQuery(
+            'SELECT \* FROM <articles> ORDER BY a \+ b',
+            $query->sql(),
+            !$this->autoQuote
+        );
+
+        $query = new Query($this->connection);
+        $query
+            ->select('*')
+            ->from('articles')
+            ->order(function ($exp, $q) {
+                return $q->func()->sum('a');
+            });
+
+        $this->assertQuotedQuery(
+            'SELECT \* FROM <articles> ORDER BY SUM\(a\)',
+            $query->sql(),
+            !$this->autoQuote
+        );
+    }
+
+    /**
      * Test orderAsc() and its input types.
      *
      * @return void
@@ -2869,7 +2939,7 @@ class QueryTest extends TestCase
         }
 
         $results = $query->decorateResults(null, true)->execute();
-        while ($row = $result->fetch('assoc')) {
+        while ($row = $results->fetch('assoc')) {
             $this->assertArrayNotHasKey('foo', $row);
             $this->assertArrayNotHasKey('modified_id', $row);
         }
@@ -4413,16 +4483,25 @@ class QueryTest extends TestCase
      */
     public function testSelectTypeConversion()
     {
+        Type::set('custom_datetime', new BarType('custom_datetime'));
         $this->loadFixtures('Comments');
+
         $query = new Query($this->connection);
         $query
-            ->select(['id', 'comment', 'the_date' => 'created'])
+            ->select(['id', 'comment', 'the_date' => 'created', 'updated'])
             ->from('comments')
             ->limit(1)
-            ->getSelectTypeMap()->setTypes(['id' => 'integer', 'the_date' => 'datetime']);
+            ->getSelectTypeMap()
+                ->setTypes([
+                    'id' => 'integer',
+                    'the_date' => 'datetime',
+                    'updated' => 'custom_datetime'
+                ]);
+
         $result = $query->execute()->fetchAll('assoc');
         $this->assertInternalType('integer', $result[0]['id']);
         $this->assertInstanceOf('DateTime', $result[0]['the_date']);
+        $this->assertInstanceOf('DateTime', $result[0]['updated']);
     }
 
     /**
@@ -4474,10 +4553,32 @@ class QueryTest extends TestCase
                 'type' => 'INNER',
                 'conditions' => ['articles.author_id = authors.id']
             ]]);
-        $this->assertArrayHasKey('authors', $query->join());
+        $this->assertArrayHasKey('authors', $query->clause('join'));
 
         $this->assertSame($query, $query->removeJoin('authors'));
-        $this->assertArrayNotHasKey('authors', $query->join());
+        $this->assertArrayNotHasKey('authors', $query->clause('join'));
+    }
+
+    /**
+     * Test join read mode
+     *
+     * @deprecated
+     * @return void
+     */
+    public function testJoinReadMode()
+    {
+        $this->loadFixtures('Articles');
+        $query = new Query($this->connection);
+        $query->select(['id', 'title'])
+            ->from('articles')
+            ->join(['authors' => [
+                'type' => 'INNER',
+                'conditions' => ['articles.author_id = authors.id']
+            ]]);
+
+        $this->deprecated(function () use ($query) {
+            $this->assertArrayHasKey('authors', $query->join());
+        });
     }
 
     /**
@@ -4777,6 +4878,25 @@ class QueryTest extends TestCase
             ->execute()
             ->fetchAssoc();
         $this->assertSame(['id' => 1, 'user_id' => 1, 'is_active' => false], $results);
+    }
+
+    /**
+     * Test that calling fetchAssoc return an empty associated array.
+     * @return void
+     * @throws \Exception
+     */
+    public function testFetchAssocWithEmptyResult()
+    {
+        $this->loadFixtures('Profiles');
+        $query = new Query($this->connection);
+
+        $results = $query
+            ->select(['id'])
+            ->from('profiles')
+            ->where(['id' => -1])
+            ->execute()
+            ->fetchAssoc();
+        $this->assertSame([], $results);
     }
 
     /**

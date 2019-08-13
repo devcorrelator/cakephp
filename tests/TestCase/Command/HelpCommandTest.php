@@ -16,6 +16,7 @@ namespace Cake\Test\TestCase\Command;
 
 use Cake\Console\Shell;
 use Cake\Core\Plugin;
+use Cake\Http\BaseApplication;
 use Cake\TestSuite\ConsoleIntegrationTestCase;
 
 /**
@@ -33,7 +34,22 @@ class HelpCommandTest extends ConsoleIntegrationTestCase
         parent::setUp();
         $this->setAppNamespace();
         $this->useCommandRunner(true);
-        Plugin::load('TestPlugin');
+        $app = $this->getMockForAbstractClass(
+            BaseApplication::class,
+            ['']
+        );
+        $app->addPlugin('TestPlugin');
+    }
+
+    /**
+     * tearDown
+     *
+     * @return void
+     */
+    public function tearDown()
+    {
+        parent::tearDown();
+        $this->clearPlugins();
     }
 
     /**
@@ -46,6 +62,7 @@ class HelpCommandTest extends ConsoleIntegrationTestCase
         $this->exec('help');
         $this->assertExitCode(Shell::CODE_SUCCESS);
         $this->assertCommandList();
+        $this->clearPlugins();
     }
 
     /**
@@ -73,7 +90,6 @@ class HelpCommandTest extends ConsoleIntegrationTestCase
             'only short alias for plugin command.'
         );
         $this->assertOutputContains('- sample', 'app shell');
-        $this->assertOutputContains('- test_plugin.sample', 'Long plugin name');
         $this->assertOutputContains('- routes', 'core shell');
         $this->assertOutputContains('- example', 'short plugin name');
         $this->assertOutputContains('- abort', 'command object');

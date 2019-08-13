@@ -49,11 +49,11 @@ class TimeTest extends TestCase
         Time::setTestNow($this->now);
         Time::setDefaultLocale($this->locale);
         Time::resetToStringFormat();
-        Time::setJsonEncodeFormat("yyyy-MM-dd'T'HH:mm:ssxxx");
+        Time::setJsonEncodeFormat("yyyy-MM-dd'T'HH':'mm':'ssxxx");
 
         FrozenTime::setDefaultLocale($this->locale);
         FrozenTime::resetToStringFormat();
-        FrozenTime::setJsonEncodeFormat("yyyy-MM-dd'T'HH:mm:ssxxx");
+        FrozenTime::setJsonEncodeFormat("yyyy-MM-dd'T'HH':'mm':'ssxxx");
 
         date_default_timezone_set('UTC');
         I18n::setLocale(I18n::DEFAULT_LOCALE);
@@ -479,6 +479,27 @@ class TimeTest extends TestCase
         $result = $time->i18nFormat(\IntlDateFormatter::FULL, 'Asia/Tokyo', 'ja-JP@calendar=japanese');
         $expected = '平成22年1月14日木曜日 22時59分28秒 日本標準時';
         $this->assertTimeFormat($expected, $result);
+    }
+
+    /**
+     * testI18nFormatUsingSystemLocale
+     *
+     * @return void
+     */
+    public function testI18nFormatUsingSystemLocale()
+    {
+        // Unset default locale for the Time class to ensure system's locale is used.
+        Time::setDefaultLocale();
+        $locale = I18n::getLocale();
+
+        $time = new Time(1556864870);
+        I18n::setLocale('ar');
+        $this->assertEquals('٢٠١٩-٠٥-٠٣', $time->i18nFormat('yyyy-MM-dd'));
+
+        I18n::setLocale('en');
+        $this->assertEquals('2019-05-03', $time->i18nFormat('yyyy-MM-dd'));
+
+        I18n::setLocale($locale);
     }
 
     /**

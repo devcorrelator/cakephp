@@ -228,7 +228,7 @@ class Session
             $this->engine($class, $config['handler']);
         }
 
-        $this->_lifetime = ini_get('session.gc_maxlifetime');
+        $this->_lifetime = (int)ini_get('session.gc_maxlifetime');
         $this->_isCLI = (PHP_SAPI === 'cli' || PHP_SAPI === 'phpdbg');
         session_register_shutdown();
     }
@@ -290,7 +290,7 @@ class Session
      */
     protected function setEngine(SessionHandlerInterface $handler)
     {
-        if (!headers_sent()) {
+        if (!headers_sent() && session_status() !== \PHP_SESSION_ACTIVE) {
             session_set_save_handler($handler, false);
         }
 
@@ -366,6 +366,26 @@ class Session
         }
 
         return $this->_started;
+    }
+
+    /**
+     * Write data and close the session
+     *
+     * @return bool True if session was started
+     */
+    public function close()
+    {
+        if (!$this->_started) {
+            return true;
+        }
+
+        if (!session_write_close()) {
+            throw new RuntimeException('Could not close the session');
+        }
+
+        $this->_started = false;
+
+        return true;
     }
 
     /**
@@ -535,7 +555,7 @@ class Session
             $this->start();
         }
 
-        if (!$this->_isCLI && session_status() === PHP_SESSION_ACTIVE) {
+        if (!$this->_isCLI && session_status() === \PHP_SESSION_ACTIVE) {
             session_destroy();
         }
 

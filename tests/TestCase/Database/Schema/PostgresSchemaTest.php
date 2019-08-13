@@ -177,6 +177,10 @@ SQL;
                 ['type' => 'string', 'fixed' => true, 'length' => 10]
             ],
             [
+                ['type' => 'CHAR(36)'],
+                ['type' => 'string', 'fixed' => true, 'length' => 36]
+            ],
+            [
                 ['type' => 'CHARACTER(10)'],
                 ['type' => 'string', 'fixed' => true, 'length' => 10]
             ],
@@ -638,6 +642,40 @@ SQL;
     }
 
     /**
+     * Test describing a table with postgres function defaults
+     *
+     * @return void
+     */
+    public function testDescribeTableFunctionDefaultValue()
+    {
+        $this->_needsConnection();
+        $connection = ConnectionManager::get('test');
+        $sql = <<<SQL
+CREATE TABLE schema_function_defaults (
+    "id" SERIAL,
+    year INT DEFAULT DATE_PART('year'::text, NOW()),
+    PRIMARY KEY("id")
+);
+SQL;
+        $connection->execute($sql);
+        $schema = new SchemaCollection($connection);
+        $result = $schema->describe('schema_function_defaults');
+        $connection->execute('DROP TABLE schema_function_defaults');
+
+        $expected = [
+            'type' => 'integer',
+            'default' => "date_part('year'::text, now())",
+            'null' => true,
+            'precision' => null,
+            'length' => 10,
+            'comment' => null,
+            'unsigned' => null,
+            'autoIncrement' => null,
+        ];
+        $this->assertEquals($expected, $result->getColumn('year'));
+    }
+
+    /**
      * Column provider for creating column sql
      *
      * @return array
@@ -662,6 +700,11 @@ SQL;
                 '"id" CHAR(32) NOT NULL'
             ],
             [
+                'title',
+                ['type' => 'string', 'length' => 36, 'fixed' => true, 'null' => false],
+                '"title" CHAR(36) NOT NULL'
+            ],
+            [
                 'id',
                 ['type' => 'uuid', 'length' => 36, 'null' => false],
                 '"id" UUID NOT NULL'
@@ -680,6 +723,11 @@ SQL;
                 'title',
                 ['type' => 'string'],
                 '"title" VARCHAR'
+            ],
+            [
+                'title',
+                ['type' => 'string', 'length' => 36],
+                '"title" VARCHAR(36)'
             ],
             [
                 'title',

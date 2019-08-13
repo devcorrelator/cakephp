@@ -582,7 +582,7 @@ class RouteTest extends TestCase
         $this->assertRegExp($result, '/source/view');
         $this->assertRegExp($result, '/source/view/other/params');
         $this->assertNotRegExp($result, '/chaw_test/wiki');
-        $this->assertNotRegExp($result, '/source/wierd_action');
+        $this->assertNotRegExp($result, '/source/weird_action');
     }
 
     /**
@@ -1067,6 +1067,24 @@ class RouteTest extends TestCase
             'id' => "\xC4\x81"
         ]);
         $this->assertEquals("/articles/view/\xC4\x81", $result);
+    }
+
+    /**
+     * Test that match() matches explicit GET routes
+     *
+     * @return void
+     */
+    public function testMatchWithExplicitGet()
+    {
+        $route = new Route(
+            '/anything',
+            ['controller' => 'Articles', 'action' => 'foo', '_method' => 'GET']
+        );
+        $result = $route->match([
+            'controller' => 'Articles',
+            'action' => 'foo'
+        ]);
+        $this->assertEquals("/anything", $result);
     }
 
     /**

@@ -398,7 +398,7 @@ class ConsoleIo
      */
     public function styles($style = null, $definition = null)
     {
-        $this->_out->styles($style, $definition);
+        return $this->_out->styles($style, $definition);
     }
 
     /**
@@ -540,12 +540,6 @@ class ConsoleIo
      */
     public function createFile($path, $contents, $forceOverwrite = false)
     {
-        $path = str_replace(
-            DIRECTORY_SEPARATOR . DIRECTORY_SEPARATOR,
-            DIRECTORY_SEPARATOR,
-            $path
-        );
-
         $this->out();
         $forceOverwrite = $forceOverwrite || $this->forceOverwrite;
 
@@ -572,6 +566,12 @@ class ConsoleIo
         }
 
         try {
+            // Create the directory using the current user permissions.
+            $directory = dirname($path);
+            if (!file_exists($directory)) {
+                mkdir($directory, 0777 ^ umask(), true);
+            }
+
             $file = new SplFileObject($path, 'w');
         } catch (RuntimeException $e) {
             $this->error("Could not write to `{$path}`. Permission denied.", 2);

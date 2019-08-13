@@ -1215,7 +1215,7 @@ class EntityTest extends TestCase
      *
      * @return void
      */
-    public function testGetAndSetErrors()
+    public function testGetErrorAndSetError()
     {
         $entity = new Entity();
         $this->assertEmpty($entity->getErrors());
@@ -1238,6 +1238,25 @@ class EntityTest extends TestCase
         ];
         $result = $entity->getErrors();
         $this->assertEquals($expectedIndexed, $result);
+    }
+
+    /**
+     * Tests reading errors from nested validator
+     *
+     * @return void
+     */
+    public function testGetErrorNested()
+    {
+        $entity = new Entity();
+        $entity->setError('options', ['subpages' => ['_empty' => 'required']]);
+
+        $expected = [
+            'subpages' => ['_empty' => 'required']
+        ];
+        $this->assertEquals($expected, $entity->getError('options'));
+
+        $expected = ['_empty' => 'required'];
+        $this->assertEquals($expected, $entity->getError('options.subpages'));
     }
 
     /**
@@ -1279,6 +1298,45 @@ class EntityTest extends TestCase
             'multiple' => $author->getError('multiple')
         ];
         $this->assertEquals($expected, $author->getErrors());
+    }
+
+    /**
+     * Tests that check if hasErrors() works
+     *
+     * @return void
+     */
+    public function testHasErrors()
+    {
+        $entity = new Entity();
+        $hasErrors = $entity->hasErrors();
+        $this->assertFalse($hasErrors);
+
+        $nestedEntity = new Entity();
+        $entity->set([
+            'nested' => $nestedEntity,
+        ]);
+        $hasErrors = $entity->hasErrors();
+        $this->assertFalse($hasErrors);
+
+        $nestedEntity->setError('description', 'oops');
+        $hasErrors = $entity->hasErrors();
+        $this->assertTrue($hasErrors);
+
+        $hasErrors = $entity->hasErrors(false);
+        $this->assertFalse($hasErrors);
+
+        $entity->clean();
+        $hasErrors = $entity->hasErrors();
+        $this->assertTrue($hasErrors);
+        $hasErrors = $entity->hasErrors(false);
+        $this->assertFalse($hasErrors);
+
+        $nestedEntity->clean();
+        $hasErrors = $entity->hasErrors();
+        $this->assertFalse($hasErrors);
+
+        $entity->setError('foo', []);
+        $this->assertFalse($entity->hasErrors());
     }
 
     /**
@@ -1523,6 +1581,7 @@ class EntityTest extends TestCase
             '[dirty]' => ['somethingElse' => true, 'foo' => true],
             '[original]' => [],
             '[virtual]' => ['baz'],
+            '[hasErrors]' => true,
             '[errors]' => ['foo' => ['An error']],
             '[invalid]' => ['foo' => 'a value'],
             '[repository]' => 'foos'

@@ -16,12 +16,14 @@ namespace Cake\Test\TestCase\Http;
 
 include_once CORE_TEST_CASES . DS . 'Http' . DS . 'server_mocks.php';
 
+use Cake\Chronos\Chronos;
 use Cake\Http\Cookie\Cookie;
 use Cake\Http\Cookie\CookieCollection;
 use Cake\Http\CorsBuilder;
 use Cake\Http\Exception\NotFoundException;
 use Cake\Http\Response;
 use Cake\Http\ServerRequest;
+use Cake\I18n\FrozenTime;
 use Cake\TestSuite\TestCase;
 use Zend\Diactoros\Stream;
 
@@ -266,6 +268,30 @@ class ResponseTest extends TestCase
     }
 
     /**
+     * @return void
+     */
+    public function testSetTypeMap()
+    {
+        $response = new Response();
+        $response->setTypeMap('ical', 'text/calendar');
+
+        $response = $response->withType('ical')->getType();
+        $this->assertEquals('text/calendar', $response);
+    }
+
+    /**
+     * @return void
+     */
+    public function testSetTypeMapAsArray()
+    {
+        $response = new Response();
+        $response->setTypeMap('ical', ['text/calendar']);
+
+        $response = $response->withType('ical')->getType();
+        $this->assertEquals('text/calendar', $response);
+    }
+
+    /**
      * Tests the withType method
      *
      * @return void
@@ -289,7 +315,7 @@ class ResponseTest extends TestCase
         );
         $this->assertSame('application/pdf', $new->getHeaderLine('Content-Type'));
         $this->assertSame(
-            'application/json; charset=UTF-8',
+            'application/json',
             $new->withType('json')->getHeaderLine('Content-Type')
         );
     }
@@ -437,7 +463,6 @@ class ResponseTest extends TestCase
         return [
             ['mp3', 'audio/mpeg'],
             ['js', 'application/javascript; charset=UTF-8'],
-            ['json', 'application/json; charset=UTF-8'],
             ['xml', 'application/xml; charset=UTF-8'],
             ['txt', 'text/plain; charset=UTF-8'],
         ];
@@ -1066,6 +1091,10 @@ class ResponseTest extends TestCase
         $new = $response->withModified($now);
         $this->assertEquals(gmdate($format) . ' GMT', $new->getHeaderLine('Last-Modified'));
 
+        $now = new \DateTimeImmutable();
+        $new = $response->withModified($now);
+        $this->assertEquals(gmdate($format) . ' GMT', $new->getHeaderLine('Last-Modified'));
+
         $time = new \DateTime('+1 day', new \DateTimeZone('UTC'));
         $new = $response->withModified('+1 day');
         $this->assertEquals($time->format($format) . ' GMT', $new->getHeaderLine('Last-Modified'));
@@ -1592,7 +1621,7 @@ class ResponseTest extends TestCase
     public function testWithCookieEmpty()
     {
         $response = new Response();
-        $new = $response->withCookie('testing');
+        $new = $response->withCookie(new Cookie('testing'));
         $this->assertNull($response->getCookie('testing'), 'withCookie does not mutate');
 
         $expected = [
@@ -1615,46 +1644,56 @@ class ResponseTest extends TestCase
     public function testWithCookieScalar()
     {
         $response = new Response();
-        $new = $response->withCookie('testing', 'abc123');
+        $new = $response->withCookie(new Cookie('testing', 'abc123'));
         $this->assertNull($response->getCookie('testing'), 'withCookie does not mutate');
         $this->assertEquals('abc123', $new->getCookie('testing')['value']);
 
-        $new = $response->withCookie('testing', 99);
+        $new = $response->withCookie(new Cookie('testing', 99));
         $this->assertEquals(99, $new->getCookie('testing')['value']);
 
-        $new = $response->withCookie('testing', false);
+        $new = $response->withCookie(new Cookie('testing', false));
         $this->assertFalse($new->getCookie('testing')['value']);
 
-        $new = $response->withCookie('testing', true);
+        $new = $response->withCookie(new Cookie('testing', true));
         $this->assertTrue($new->getCookie('testing')['value']);
     }
 
     /**
-     * Test withCookie() and array data.
+     * Test withCookie() and duplicate data
      *
      * @return void
+     * @throws \Exception
      */
-    public function testWithCookieArray()
+    public function testWithDuplicateCookie()
     {
+        $expiry = new \DateTimeImmutable('+24 hours');
+
         $response = new Response();
-        $cookie = [
-            'name' => 'ignored key',
-            'value' => '[a,b,c]',
-            'expire' => 1000,
-            'path' => '/test',
-            'secure' => true
-        ];
-        $new = $response->withCookie('testing', $cookie);
+        $cookie = new Cookie(
+            'testing',
+            '[a,b,c]',
+            $expiry,
+            '/test',
+            '',
+            true
+        );
+
+        $new = $response->withCookie($cookie);
         $this->assertNull($response->getCookie('testing'), 'withCookie does not mutate');
+
         $expected = [
             'name' => 'testing',
             'value' => '[a,b,c]',
-            'expire' => 1000,
+            'expire' => $expiry,
             'path' => '/test',
             'domain' => '',
             'secure' => true,
             'httpOnly' => false
         ];
+
+        // Match the date time formatting to Response::convertCookieToArray
+        $expected['expire'] = $expiry->format('U');
+
         $this->assertEquals($expected, $new->getCookie('testing'));
     }
 
@@ -1677,15 +1716,18 @@ class ResponseTest extends TestCase
     public function testWithExpiredCookieScalar()
     {
         $response = new Response();
-        $response = $response->withCookie('testing', 'abc123');
+        $response = $response->withCookie(new Cookie('testing', 'abc123'));
         $this->assertEquals('abc123', $response->getCookie('testing')['value']);
 
-        $new = $response->withExpiredCookie('testing');
+        $new = $response->withExpiredCookie(new Cookie('testing'));
 
         $this->assertNull($response->getCookie('testing')['expire']);
-        $this->assertEquals('1', $new->getCookie('testing')['expire']);
+        $this->assertLessThan(FrozenTime::createFromTimestamp(1), $new->getCookie('testing')['expire']);
     }
 
+    /**
+     * @throws \Exception If DateImmutable emits an error.
+     */
     public function testWithExpiredCookieOptions()
     {
         $options = [
@@ -1695,18 +1737,30 @@ class ResponseTest extends TestCase
             'path' => '/custompath/',
             'secure' => true,
             'httpOnly' => true,
-            'expire' => (string)strtotime('+14 days'),
+            'expire' => new \DateTimeImmutable('+14 days'),
         ];
 
+        $cookie = new Cookie(
+            $options['name'],
+            $options['value'],
+            $options['expire'],
+            $options['path'],
+            $options['domain'],
+            $options['secure'],
+            $options['httpOnly']
+        );
+
         $response = new Response();
-        $response = $response->withCookie('testing', $options);
+        $response = $response->withCookie($cookie);
+
+        // Change the timestamp format to match the Response::convertCookieToArray
+        $options['expire'] = $options['expire']->format('U');
         $this->assertEquals($options, $response->getCookie('testing'));
 
-        $new = $response->withExpiredCookie('testing', $options);
+        $expiredCookie = $response->withExpiredCookie($cookie);
 
         $this->assertEquals($options['expire'], $response->getCookie('testing')['expire']);
-        $this->assertEquals('1', $new->getCookie('testing')['expire']);
-        $this->assertEquals('', $new->getCookie('testing')['value']);
+        $this->assertLessThan(Chronos::createFromTimestamp(1), $expiredCookie->getCookie('testing')['expire']);
     }
 
     public function testWithExpiredCookieObject()
@@ -1730,8 +1784,8 @@ class ResponseTest extends TestCase
     public function testGetCookies()
     {
         $response = new Response();
-        $new = $response->withCookie('testing', 'a')
-            ->withCookie('test2', ['value' => 'b', 'path' => '/test', 'secure' => true]);
+        $new = $response->withCookie(new Cookie('testing', 'a'))
+            ->withCookie(new Cookie('test2', 'b', null, '/test', '', true));
         $expected = [
             'testing' => [
                 'name' => 'testing',
@@ -1773,7 +1827,7 @@ class ResponseTest extends TestCase
                 'name' => 'urmc',
                 'value' => '{"user_id":1,"token":"abc123"}',
                 'expire' => null,
-                'path' => '',
+                'path' => '/',
                 'domain' => '',
                 'secure' => false,
                 'httpOnly' => true
@@ -1790,8 +1844,8 @@ class ResponseTest extends TestCase
     public function testGetCookieCollection()
     {
         $response = new Response();
-        $new = $response->withCookie('testing', 'a')
-            ->withCookie('test2', ['value' => 'b', 'path' => '/test', 'secure' => true]);
+        $new = $response->withCookie(new Cookie('testing', 'a'))
+            ->withCookie(new Cookie('test2', 'b', null, '/test', '', true));
         $cookies = $response->getCookieCollection();
         $this->assertInstanceOf(CookieCollection::class, $cookies);
         $this->assertCount(0, $cookies, 'Original response not mutated');
@@ -1802,6 +1856,22 @@ class ResponseTest extends TestCase
 
         $this->assertTrue($cookies->has('testing'));
         $this->assertTrue($cookies->has('test2'));
+    }
+
+    /**
+     * Test withCookieCollection()
+     *
+     * @return void
+     */
+    public function testWithCookieCollection()
+    {
+        $response = new Response();
+        $collection = new CookieCollection([new Cookie('foo', 'bar')]);
+        $newResponse = $response->withCookieCollection($collection);
+
+        $this->assertNotSame($response, $newResponse);
+        $this->assertNotSame($response->getCookieCollection(), $newResponse->getCookieCollection());
+        $this->assertSame($newResponse->getCookie('foo')['value'], 'bar');
     }
 
     /**

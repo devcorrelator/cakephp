@@ -32,7 +32,7 @@ class BelongsToTest extends TestCase
      *
      * @var array
      */
-    public $fixtures = ['core.articles', 'core.authors', 'core.comments'];
+    public $fixtures = ['core.Articles', 'core.Authors', 'core.Comments'];
 
     /**
      * Set up
@@ -433,5 +433,27 @@ class BelongsToTest extends TestCase
         $association->attachTo($query, ['queryBuilder' => function ($q) {
             return $q->applyOptions(['something' => 'more']);
         }]);
+    }
+
+    /**
+     * Test that failing to add the foreignKey to the list of fields will throw an
+     * exception
+     *
+     * @return void
+     */
+    public function testAttachToNoFieldsSelected()
+    {
+        $articles = $this->getTableLocator()->get('Articles');
+        $association = $articles->belongsTo('Authors');
+
+        $query = $articles->find()
+            ->select(['Authors.name'])
+            ->where(['Articles.id' => 1])
+            ->contain('Authors');
+        $result = $query->firstOrFail();
+
+        $this->assertNotEmpty($result->author);
+        $this->assertSame('mariano', $result->author->name);
+        $this->assertSame(['author'], array_keys($result->toArray()), 'No other properties included.');
     }
 }

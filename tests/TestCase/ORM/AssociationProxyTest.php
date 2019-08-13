@@ -29,7 +29,7 @@ class AssociationProxyTest extends TestCase
      * @var array
      */
     public $fixtures = [
-        'core.articles', 'core.authors', 'core.comments'
+        'core.Articles', 'core.Authors', 'core.Comments'
     ];
 
     /**
@@ -68,7 +68,7 @@ class AssociationProxyTest extends TestCase
     public function testGetBadAssociation()
     {
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('Table "Cake\ORM\Table" is not associated with "posts"');
+        $this->expectExceptionMessage('You have not defined');
         $articles = $this->getTableLocator()->get('articles');
         $articles->posts;
     }

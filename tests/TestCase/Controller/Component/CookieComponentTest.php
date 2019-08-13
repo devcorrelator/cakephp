@@ -166,7 +166,7 @@ class CookieComponentTest extends TestCase
     public function testReadInvalidCipher()
     {
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('Invalid encryption cipher. Must be one of aes, rijndael.');
+        $this->expectExceptionMessage('Invalid encryption cipher. Must be one of aes, rijndael or false.');
         $this->Controller->request = $this->request->withCookieParams([
             'Test' => $this->_encrypt('value'),
         ]);
@@ -249,7 +249,7 @@ class CookieComponentTest extends TestCase
     public function testWriteInvalidCipher()
     {
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('Invalid encryption cipher. Must be one of aes, rijndael.');
+        $this->expectExceptionMessage('Invalid encryption cipher. Must be one of aes, rijndael or false.');
         $this->Cookie->setConfig('encryption', 'derp');
         $this->Cookie->write('Test', 'nope');
     }
@@ -439,7 +439,7 @@ class CookieComponentTest extends TestCase
         $expected = [
             'name' => 'Testing',
             'value' => '',
-            'expire' => (new Time('now'))->format('U') - 42000,
+            'expire' => '1',
             'path' => '/',
             'domain' => '',
             'secure' => false,
@@ -647,6 +647,40 @@ class CookieComponentTest extends TestCase
         $data = $this->Cookie->read('Plain_multi_cookies');
         $expected = ['name' => 'CakePHP', 'version' => '1.2.0.x', 'tag' => 'CakePHP Rocks!'];
         $this->assertEquals($expected, $data);
+    }
+
+    /**
+     * testReadingMalformedEncryptedCookies
+     *
+     * @return void
+     */
+    public function testReadingMalformedEncryptedCookies()
+    {
+        $this->Cookie->configKey('Encrypted_empty', 'encryption', 'aes');
+        $this->Cookie->configKey('Encrypted_wrong_prefix', 'encryption', 'aes');
+        $this->Cookie->configKey('Encrypted_altered', 'encryption', 'aes');
+        $this->Cookie->configKey('Encrypted_invalid_chars', 'encryption', 'aes');
+
+        $encrypted = $this->_encrypt('secret data', 'aes');
+
+        $this->Controller->request = $this->request->withCookieParams([
+            'Encrypted_empty' => '',
+            'Encrypted_wrong_prefix' => substr_replace($encrypted, 'foo', 0, 3),
+            'Encrypted_altered' => str_replace('M', 'A', $encrypted),
+            'Encrypted_invalid_chars' => str_replace('M', 'M#', $encrypted),
+        ]);
+
+        $data = $this->Cookie->read('Encrypted_empty');
+        $this->assertSame('', $data);
+
+        $data = $this->Cookie->read('Encrypted_wrong_prefix');
+        $this->assertSame('', $data);
+
+        $data = $this->Cookie->read('Encrypted_altered');
+        $this->assertSame('', $data);
+
+        $data = $this->Cookie->read('Encrypted_invalid_chars');
+        $this->assertSame('', $data);
     }
 
     /**

@@ -21,6 +21,7 @@ use Cake\ORM\Entity;
 use Cake\ORM\ResultSet;
 use Cake\ORM\Table;
 use Cake\TestSuite\TestCase;
+use TestApp\Model\Entity\Article;
 
 /**
  * ResultSet test case.
@@ -28,7 +29,7 @@ use Cake\TestSuite\TestCase;
 class ResultSetTest extends TestCase
 {
 
-    public $fixtures = ['core.articles', 'core.authors', 'core.comments'];
+    public $fixtures = ['core.Articles', 'core.Authors', 'core.Comments'];
 
     /**
      * setup
@@ -382,7 +383,7 @@ class ResultSetTest extends TestCase
      */
     public function testSourceOnContainAssociations()
     {
-        Plugin::load('TestPlugin');
+        $this->loadPlugins(['TestPlugin']);
         $comments = $this->getTableLocator()->get('TestPlugin.Comments');
         $comments->belongsTo('Authors', [
             'className' => 'TestPlugin.Authors',
@@ -397,6 +398,7 @@ class ResultSetTest extends TestCase
         })->first();
         $this->assertEquals('TestPlugin.Comments', $result->getSource());
         $this->assertEquals('TestPlugin.Authors', $result->_matchingData['Authors']->getSource());
+        $this->clearPlugins();
     }
 
     /**
@@ -415,5 +417,42 @@ class ResultSetTest extends TestCase
         $res = $query->all();
         $res->isEmpty();
         $this->assertCount(6, $res->toArray());
+    }
+
+    /**
+     * Test that ResultSet
+     *
+     * @return void
+     */
+    public function testCollectionMinAndMax()
+    {
+        $query = $this->table->find('all');
+
+        $min = $query->min('id');
+        $minExpected = $this->table->get(1);
+
+        $max = $query->max('id');
+        $maxExpected = $this->table->get(3);
+
+        $this->assertEquals($minExpected, $min);
+        $this->assertEquals($maxExpected, $max);
+    }
+
+    /**
+     * Test that ResultSet
+     *
+     * @return void
+     */
+    public function testCollectionMinAndMaxWithAggregateField()
+    {
+        $query = $this->table->find();
+        $query->select([
+            'counter' => 'COUNT(*)'
+        ])->group('author_id');
+
+        $min = $query->min('counter');
+        $max = $query->max('counter');
+
+        $this->assertTrue($max > $min);
     }
 }

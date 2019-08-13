@@ -53,7 +53,7 @@ class EntityContextTest extends TestCase
      *
      * @var array
      */
-    public $fixtures = ['core.articles', 'core.comments', 'core.articles_tags', 'core.tags'];
+    public $fixtures = ['core.Articles', 'core.Comments', 'core.ArticlesTags', 'core.Tags'];
 
     /**
      * setup method.
@@ -64,6 +64,25 @@ class EntityContextTest extends TestCase
     {
         parent::setUp();
         $this->request = new ServerRequest();
+    }
+
+    /**
+     * tests getRequiredMessage
+     *
+     * @return void
+     */
+    public function testGetRequiredMessage()
+    {
+        $this->_setupTables();
+
+        $context = new EntityContext($this->request, [
+            'entity' => new Article(),
+            'table' => 'Articles',
+            'validator' => 'create',
+        ]);
+
+        $this->assertNull($context->getRequiredMessage('body'));
+        $this->assertSame('Don\'t forget a title!', $context->getRequiredMessage('title'));
     }
 
     /**
@@ -701,6 +720,53 @@ class EntityContextTest extends TestCase
     }
 
     /**
+     * Test getting association default value from table schema.
+     *
+     * @return void
+     */
+    public function testValAssociatedSchemaDefault()
+    {
+        $table = $this->getTableLocator()->get('Articles');
+        $associatedTable = $table->hasMany('Comments')->getTarget();
+        $column = $associatedTable->getSchema()->getColumn('comment');
+        $associatedTable->getSchema()->addColumn('comment', ['default' => 'default comment'] + $column);
+        $row = $table->newEntity();
+
+        $context = new EntityContext($this->request, [
+            'entity' => $row,
+            'table' => 'Articles',
+        ]);
+        $result = $context->val('comments.0.comment');
+        $this->assertEquals('default comment', $result);
+    }
+
+    /**
+     * Test getting association join table default value from table schema.
+     *
+     * @return void
+     */
+    public function testValAssociatedJoinTableSchemaDefault()
+    {
+        $table = $this->getTableLocator()->get('Articles');
+        $joinTable = $table
+            ->belongsToMany('Tags')
+            ->setThrough('ArticlesTags')
+            ->junction();
+        $joinTable->getSchema()->addColumn('column', [
+            'default' => 'default join table column value',
+            'type' => 'text'
+        ]);
+        $row = $table->newEntity();
+
+        $context = new EntityContext($this->request, [
+            'entity' => $row,
+            'table' => 'Articles',
+        ]);
+        $result = $context->val('tags.0._joinData.column');
+        $this->assertEquals('default join table column value', $result);
+    }
+
+    /**
      * Test validator for boolean fields.
      *
      * @return void
@@ -1246,6 +1312,62 @@ class EntityContextTest extends TestCase
     }
 
     /**
+     * Test error on nested validation
+     *
+     * @return void
+     */
+    public function testErrorNestedValidator()
+    {
+        $this->_setupTables();
+
+        $row = new Article([
+            'title' => 'My title',
+            'options' => ['subpages' => '']
+        ]);
+        $row->setError('options', ['subpages' => ['_empty' => 'required value']]);
+
+        $context = new EntityContext($this->request, [
+            'entity' => $row,
+            'table' => 'Articles',
+        ]);
+        $expected = ['_empty' => 'required value'];
+        $this->assertEquals($expected, $context->error('options.subpages'));
+    }
+
+    /**
+     * Test error on nested validation
+     *
+     * @return void
+     */
+    public function testErrorAssociatedNestedValidator()
+    {
+        $this->_setupTables();
+
+        $tagOne = new Tag(['name' => 'first-post']);
+        $tagTwo = new Tag(['name' => 'second-post']);
+        $tagOne->setError(
+            'metadata',
+            ['description' => ['_empty' => 'required value']]
+        );
+        $row = new Article([
+            'title' => 'My title',
+            'tags' => [
+                $tagOne,
+                $tagTwo
+            ]
+        ]);
+
+        $context = new EntityContext($this->request, [
+            'entity' => $row,
+            'table' => 'Articles',
+        ]);
+        $expected = ['_empty' => 'required value'];
+        $this->assertSame([], $context->error('tags.0.notthere'));
+        $this->assertSame([], $context->error('tags.1.notthere'));
+        $this->assertEquals($expected, $context->error('tags.0.metadata.description'));
+    }
+
+    /**
      * Setup tables for tests.
      *
      * @return void
@@ -1283,6 +1405,7 @@ class EntityContextTest extends TestCase
         ]);
 
         $validator = new Validator();
+        $validator->requirePresence('title', true, 'Don\'t forget a title!');
         $validator->add('title', 'minlength', [
             'rule' => ['minlength', 10]
         ])

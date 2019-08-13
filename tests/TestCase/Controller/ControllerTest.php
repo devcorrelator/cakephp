@@ -23,6 +23,7 @@ use Cake\Http\Response;
 use Cake\Http\ServerRequest;
 use Cake\Routing\Router;
 use Cake\TestSuite\TestCase;
+use PHPUnit\Framework\Error\Notice;
 use TestApp\Controller\Admin\PostsController;
 use TestPlugin\Controller\TestPluginController;
 
@@ -130,7 +131,7 @@ class TestController extends ControllerTestAppController
 
     public function returner()
     {
-        return 'I am from the controller.';
+        return $this->response->withStringBody('I am from the controller.');
     }
 
     //@codingStandardsIgnoreStart
@@ -231,8 +232,8 @@ class ControllerTest extends TestCase
      * @var array
      */
     public $fixtures = [
-        'core.comments',
-        'core.posts'
+        'core.Comments',
+        'core.Posts'
     ];
 
     /**
@@ -256,7 +257,7 @@ class ControllerTest extends TestCase
     public function tearDown()
     {
         parent::tearDown();
-        Plugin::unload();
+        $this->clearPlugins();
     }
 
     /**
@@ -271,7 +272,7 @@ class ControllerTest extends TestCase
         $Controller = new Controller($request, $response);
         $Controller->modelClass = 'SiteArticles';
 
-        $this->assertFalse($Controller->Articles);
+        $this->assertFalse(isset($Controller->Articles));
         $this->assertInstanceOf(
             'Cake\ORM\Table',
             $Controller->SiteArticles
@@ -280,11 +281,32 @@ class ControllerTest extends TestCase
 
         $Controller->modelClass = 'Articles';
 
-        $this->assertFalse($Controller->SiteArticles);
+        $this->assertFalse(isset($Controller->SiteArticles));
         $this->assertInstanceOf(
             'TestApp\Model\Table\ArticlesTable',
             $Controller->Articles
         );
+    }
+
+    /**
+     * testUndefinedPropertyError
+     *
+     * @return void
+     */
+    public function testUndefinedPropertyError()
+    {
+        $controller = new Controller();
+
+        $controller->Bar = true;
+        $this->assertTrue($controller->Bar);
+
+        $this->expectException(Notice::class);
+        $this->expectExceptionMessage(sprintf(
+            'Undefined property: Controller::$Foo in %s on line %s',
+            __FILE__,
+            __LINE__ + 2
+        ));
+        $controller->Foo->baz();
     }
 
     /**
@@ -318,7 +340,7 @@ class ControllerTest extends TestCase
      */
     public function testLoadModelInPlugins()
     {
-        Plugin::load('TestPlugin');
+        $this->loadPlugins(['TestPlugin']);
 
         $Controller = new TestPluginController();
         $Controller->setPlugin('TestPlugin');
@@ -343,7 +365,7 @@ class ControllerTest extends TestCase
      */
     public function testConstructSetModelClass()
     {
-        Plugin::load('TestPlugin');
+        $this->loadPlugins(['TestPlugin']);
 
         $request = new ServerRequest();
         $response = new Response();
@@ -368,7 +390,7 @@ class ControllerTest extends TestCase
      */
     public function testConstructClassesWithComponents()
     {
-        Plugin::load('TestPlugin');
+        $this->loadPlugins(['TestPlugin']);
 
         $Controller = new TestPluginController(new ServerRequest(), new Response());
         $Controller->loadComponent('TestPlugin.Other');
@@ -383,7 +405,7 @@ class ControllerTest extends TestCase
      */
     public function testRender()
     {
-        Plugin::load('TestPlugin');
+        $this->loadPlugins(['TestPlugin']);
 
         $request = new ServerRequest([
             'url' => 'controller_posts/index',
@@ -901,11 +923,13 @@ class ControllerTest extends TestCase
                 'pass' => []
             ]
         ]);
-        $response = $this->getMockBuilder('Cake\Http\Response')->getMock();
+        $response = new Response();
 
         $Controller = new TestController($url, $response);
         $result = $Controller->invokeAction();
-        $this->assertEquals('I am from the controller.', $result);
+
+        $this->assertEquals('I am from the controller.', (string)$result);
+        $this->assertEquals('I am from the controller.', (string)$Controller->getResponse());
     }
 
     /**

@@ -16,6 +16,7 @@ namespace Cake\Test\TestCase\Error;
 
 use Cake\Core\Configure;
 use Cake\Core\Plugin;
+use Cake\Datasource\Exception\RecordNotFoundException;
 use Cake\Error\ErrorHandler;
 use Cake\Error\PHP7ErrorException;
 use Cake\Http\Exception\ForbiddenException;
@@ -112,6 +113,7 @@ class ErrorHandlerTest extends TestCase
     {
         parent::tearDown();
         Log::reset();
+        $this->clearPlugins();
         if ($this->_restoreError) {
             restore_error_handler();
             restore_exception_handler();
@@ -345,6 +347,32 @@ class ErrorHandlerTest extends TestCase
     }
 
     /**
+     * test logging attributes with previous exception
+     *
+     * @return void
+     */
+    public function testHandleExceptionLogPrevious()
+    {
+        $errorHandler = new TestErrorHandler([
+            'log' => true,
+            'trace' => true,
+        ]);
+
+        $previous = new RecordNotFoundException('Previous logged');
+        $error = new NotFoundException('Kaboom!', null, $previous);
+
+        $this->_logger->expects($this->at(0))
+            ->method('log')
+            ->with('error', $this->logicalAnd(
+                $this->stringContains('[Cake\Http\Exception\NotFoundException] Kaboom!'),
+                $this->stringContains('Caused by: [Cake\Datasource\Exception\RecordNotFoundException] Previous logged'),
+                $this->stringContains('ErrorHandlerTest->testHandleExceptionLogPrevious')
+            ));
+
+        $errorHandler->handleException($error);
+    }
+
+    /**
      * test handleException generating log.
      *
      * @return void
@@ -380,7 +408,7 @@ class ErrorHandlerTest extends TestCase
      */
     public function testLoadPluginHandler()
     {
-        Plugin::load('TestPlugin');
+        $this->loadPlugins(['TestPlugin']);
         $errorHandler = new TestErrorHandler([
             'exceptionRenderer' => 'TestPlugin.TestPluginExceptionRenderer',
         ]);

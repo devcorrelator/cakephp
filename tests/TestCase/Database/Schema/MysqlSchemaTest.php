@@ -124,6 +124,10 @@ class MysqlSchemaTest extends TestCase
                 ['type' => 'binaryuuid', 'length' => null]
             ],
             [
+                'BINARY(1)',
+                ['type' => 'binary', 'length' => 1]
+            ],
+            [
                 'TEXT',
                 ['type' => 'text', 'length' => null]
             ],
@@ -590,6 +594,16 @@ SQL;
                 'body',
                 ['type' => 'binary', 'length' => TableSchema::LENGTH_LONG, 'null' => false],
                 '`body` LONGBLOB NOT NULL'
+            ],
+            [
+                'bytes',
+                ['type' => 'binary', 'length' => 5],
+                '`bytes` VARBINARY(5)'
+            ],
+            [
+                'bit',
+                ['type' => 'binary', 'length' => 1],
+                '`bit` BINARY(1)'
             ],
             // Integers
             [

@@ -20,6 +20,7 @@ use Cake\Core\Plugin;
 use Cake\Shell\I18nShell;
 use Cake\Shell\RoutesShell;
 use Cake\TestSuite\TestCase;
+use InvalidArgumentException;
 use stdClass;
 use TestApp\Command\DemoCommand;
 
@@ -134,6 +135,39 @@ class CommandCollectionTest extends TestCase
         $collection = new CommandCollection();
         $shell = new stdClass();
         $collection->add('routes', $shell);
+    }
+
+    /**
+     * Provider for invalid names.
+     *
+     * @return array
+     */
+    public function invalidNameProvider()
+    {
+        return [
+            // Empty
+            [''],
+            // Leading spaces
+            [' spaced'],
+            // Trailing spaces
+            ['spaced '],
+            // Too many words
+            ['one two three four'],
+        ];
+    }
+
+    /**
+     * test adding a command instance.
+     *
+     * @dataProvider invalidNameProvider
+     * @return void
+     */
+    public function testAddCommandInvalidName($name)
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage("The command name `$name` is invalid.");
+        $collection = new CommandCollection();
+        $collection->add($name, DemoCommand::class);
     }
 
     /**
@@ -256,8 +290,7 @@ class CommandCollectionTest extends TestCase
      */
     public function testDiscoverPlugin()
     {
-        Plugin::load('TestPlugin');
-        Plugin::load('Company/TestPluginThree');
+        $this->loadPlugins(['TestPlugin', 'Company/TestPluginThree']);
 
         $collection = new CommandCollection();
         // Add a dupe to test de-duping
@@ -297,5 +330,6 @@ class CommandCollectionTest extends TestCase
             'Long names are stored as well'
         );
         $this->assertSame($result['company'], $result['company/test_plugin_three.company']);
+        $this->clearPlugins();
     }
 }

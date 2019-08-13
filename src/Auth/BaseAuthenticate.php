@@ -22,12 +22,9 @@ use Cake\ORM\Locator\LocatorAwareTrait;
 
 /**
  * Base Authentication class with common methods and properties.
- *
- * @mixin \Cake\Core\InstanceConfigTrait
  */
 abstract class BaseAuthenticate implements EventListenerInterface
 {
-
     use InstanceConfigTrait;
     use LocatorAwareTrait;
 
@@ -142,8 +139,8 @@ abstract class BaseAuthenticate implements EventListenerInterface
             $result->unsetProperty($passwordField);
         }
         $hidden = $result->getHidden();
-        if ($password === null && in_array($passwordField, $hidden)) {
-            $key = array_search($passwordField, $hidden);
+        if ($password === null && in_array($passwordField, $hidden, true)) {
+            $key = array_search($passwordField, $hidden, true);
             unset($hidden[$key]);
             $result->setHidden($hidden);
         }

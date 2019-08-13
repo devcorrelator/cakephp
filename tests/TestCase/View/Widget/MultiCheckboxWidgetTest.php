@@ -18,6 +18,7 @@ use Cake\TestSuite\TestCase;
 use Cake\View\StringTemplate;
 use Cake\View\Widget\LabelWidget;
 use Cake\View\Widget\MultiCheckboxWidget;
+use Cake\View\Widget\NestingLabelWidget;
 
 /**
  * MultiCheckbox test case.
@@ -36,6 +37,7 @@ class MultiCheckboxWidgetTest extends TestCase
         $templates = [
             'checkbox' => '<input type="checkbox" name="{{name}}" value="{{value}}"{{attrs}}>',
             'label' => '<label{{attrs}}>{{text}}</label>',
+            'nestingLabel' => '<label{{attrs}}>{{input}}{{text}}</label>',
             'checkboxWrapper' => '<div class="checkbox">{{input}}{{label}}</div>',
             'multicheckboxWrapper' => '<fieldset{{attrs}}>{{content}}</fieldset>',
             'multicheckboxTitle' => '<legend>{{text}}</legend>',
@@ -441,6 +443,42 @@ class MultiCheckboxWidgetTest extends TestCase
     }
 
     /**
+     * Test rendering without input nesting inspite of using NestingLabelWidget
+     *
+     * @return void
+     */
+    public function testRenderNestingLabelWidgetWithoutInputNesting()
+    {
+        $label = new NestingLabelWidget($this->templates);
+        $input = new MultiCheckboxWidget($this->templates, $label);
+        $data = [
+            'name' => 'tags',
+            'label' => [
+                'input' => false,
+            ],
+            'options' => [
+                1 => 'CakePHP',
+            ],
+        ];
+        $result = $input->render($data, $this->context);
+
+        $expected = [
+            ['div' => ['class' => 'checkbox']],
+            ['input' => [
+                'type' => 'checkbox',
+                'name' => 'tags[]',
+                'value' => 1,
+                'id' => 'tags-1',
+            ]],
+            ['label' => ['for' => 'tags-1']],
+            'CakePHP',
+            '/label',
+            '/div',
+        ];
+        $this->assertHtml($expected, $result);
+    }
+
+    /**
      * Test render with groupings.
      *
      * @return void
@@ -607,6 +645,72 @@ class MultiCheckboxWidgetTest extends TestCase
             '2',
             '/label',
             '/div'
+        ];
+        $this->assertHtml($expected, $result);
+    }
+
+    /**
+     * testRenderExplicitId method
+     *
+     * Test that the id passed is actually used
+     * Issue: https://github.com/cakephp/cakephp/issues/13342
+     *
+     * @return void
+     */
+    public function testRenderExplicitId()
+    {
+        $label = new LabelWidget($this->templates);
+        $input = new MultiCheckboxWidget($this->templates, $label);
+        $data = [
+            'name' => 'field',
+            'options' => ['value1', 'value2'],
+            'id' => 'alternative-id',
+            'idPrefix' => 'willBeIgnored',
+        ];
+        $result = $input->render($data, $this->context);
+        $expected = [
+            [
+                'div' => ['class' => 'checkbox'],
+                'input' => ['type' => 'checkbox', 'name' => 'field[]', 'value' => '0', 'id' => 'alternative-id-0'],
+                'label' => ['for' => 'alternative-id-0'],
+            ],
+            'value1',
+            '/label',
+            '/div',
+            [
+                'div' => ['class' => 'checkbox'],
+                'input' => ['type' => 'checkbox', 'name' => 'field[]', 'value' => '1', 'id' => 'alternative-id-1'],
+                'label' => ['for' => 'alternative-id-1'],
+            ],
+            'value2',
+            '/label',
+            '/div',
+        ];
+        $this->assertHtml($expected, $result);
+
+        $data = [
+            'name' => 'field',
+            'options' => ['value1', 'value2'],
+            'idPrefix' => 'formprefix',
+        ];
+        $result = $input->render($data, $this->context);
+        $expected = [
+            [
+                'div' => ['class' => 'checkbox'],
+                'input' => ['type' => 'checkbox', 'name' => 'field[]', 'value' => '0', 'id' => 'formprefix-field-0'],
+                'label' => ['for' => 'formprefix-field-0'],
+            ],
+            'value1',
+            '/label',
+            '/div',
+            [
+                'div' => ['class' => 'checkbox'],
+                'input' => ['type' => 'checkbox', 'name' => 'field[]', 'value' => '1', 'id' => 'formprefix-field-1'],
+                'label' => ['for' => 'formprefix-field-1'],
+            ],
+            'value2',
+            '/label',
+            '/div',
         ];
         $this->assertHtml($expected, $result);
     }
